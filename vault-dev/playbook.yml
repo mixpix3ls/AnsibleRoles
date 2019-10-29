@@ -1,0 +1,45 @@
+---
+- name: vault server
+  hosts: all
+  become: true
+
+  vars:
+    VAULT_VERSION: 1.2.3
+
+  tasks:
+    - name: Install neccessary packages
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - curl
+        - unzip
+    - name: "Extract vault {{ VAULT_VERSION }}"
+      unarchive:
+        src: "https://releases.hashicorp.com/vault/{{ VAULT_VERSION }}/vault_{{ VAULT_VERSION }}_linux_amd64.zip"
+        dest: /usr/local/bin
+        remote_src: yes
+    - name: Set vault binary owner
+      file:
+        path: /usr/local/bin/vault
+        owner: root
+        group: root
+    - name: Enable vault autocompletion
+      shell: vault -autocomplete-install
+      ignore_errors: yes
+    - name: Set capabilities
+      capabilities:
+        path: /usr/local/bin/vault
+        capability: cap_ipc_lock=+ep
+        state: present
+    - name: Create a unique, non-privileged system user to run Vault
+      user:
+        name: vault
+        shell: /bin/false
+        create_home: true
+        home: /etc/vault.d
+        system: yes
+    - name: Create vault.service file
+      copy:
+        src: vault.service
+        dest: /etc/systemd/system/vault.service
